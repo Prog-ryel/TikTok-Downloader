@@ -30,12 +30,6 @@ app.post('/api/video-info', async (req, res) => {
             throw new Error(apiResponse.data.msg || 'Failed to fetch video');
         }
 
-        // Modify the response to use our proxy for video playback
-        if (apiResponse.data.data && apiResponse.data.data.play) {
-            const originalUrl = apiResponse.data.data.play;
-            apiResponse.data.data.play = `/proxy/video?url=${encodeURIComponent(originalUrl)}`;
-        }
-        
         res.json(apiResponse.data);
     } catch (error) {
         console.error('Video info error:', error);
@@ -47,9 +41,9 @@ app.post('/api/video-info', async (req, res) => {
 });
 
 // Download endpoint
-app.get('/api/download', async (req, res) => {
+app.post('/api/download', async (req, res) => {
     try {
-        const { url, format } = req.query;
+        const { url } = req.body;
         if (!url) {
             return res.status(400).json({ error: 'URL is required' });
         }
@@ -59,34 +53,21 @@ app.get('/api/download', async (req, res) => {
             'Referer': 'https://www.tiktok.com/'
         };
 
-        // Get video info first
         const apiResponse = await axios.get(`https://www.tikwm.com/api/?url=${url}`, { headers });
         
         if (apiResponse.data.code !== 0 || !apiResponse.data.data || !apiResponse.data.data.play) {
             throw new Error('Failed to get video information');
         }
 
-        const videoUrl = apiResponse.data.data.play;
-        const videoTitle = apiResponse.data.data.title || 'tiktok_video';
-        
-        // Stream the video
-        const videoResponse = await axios({
-            method: 'GET',
-            url: videoUrl,
-            responseType: 'stream',
-            headers
+        res.json({
+            success: true,
+            url: apiResponse.data.data.play,
+            title: apiResponse.data.data.title || 'tiktok_video'
         });
-
-        // Set headers for download
-        res.setHeader('Content-Type', 'video/mp4');
-        res.setHeader('Content-Disposition', `attachment; filename="${videoTitle}.mp4"`);
-        
-        // Pipe the video stream to response
-        videoResponse.data.pipe(res);
     } catch (error) {
         console.error('Download error:', error);
         res.status(500).json({ 
-            error: 'Failed to download video',
+            error: 'Failed to get download URL',
             details: error.message 
         });
     }
