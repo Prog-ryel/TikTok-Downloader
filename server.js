@@ -5,8 +5,6 @@ const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const compression = require('compression');
-const ffmpeg = require('fluent-ffmpeg');
-const { Readable } = require('stream');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -74,40 +72,40 @@ app.post('/api/download', async (req, res) => {
 
         const apiResponse = await axios.get(`https://www.tikwm.com/api/?url=${url}`, { headers });
         
-        if (apiResponse.data.code !== 0 || !apiResponse.data.data || !apiResponse.data.data.play) {
+        if (apiResponse.data.code !== 0 || !apiResponse.data.data) {
             throw new Error('Failed to get video information');
         }
 
-        const videoUrl = apiResponse.data.data.play;
-        const videoResponse = await axios.get(videoUrl, {
-            responseType: 'arraybuffer',
-            headers
-        });
-
-        // Set filename and content type
-        const filename = format === 'mp3' ? 'tiktok_audio.mp3' : 'tiktok_video.mp4';
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-
+        // For MP3, use the music URL if available
         if (format === 'mp3') {
-            // Convert to MP3 using ffmpeg
-            res.setHeader('Content-Type', 'audio/mpeg');
-            
-            const inputStream = new Readable();
-            inputStream.push(videoResponse.data);
-            inputStream.push(null);
+            const musicUrl = apiResponse.data.data.music;
+            if (!musicUrl) {
+                throw new Error('No audio available for this video');
+            }
 
-            ffmpeg(inputStream)
-                .toFormat('mp3')
-                .audioBitrate('192k')
-                .on('error', (err) => {
-                    console.error('FFmpeg error:', err);
-                    res.status(500).json({ error: 'Failed to convert to MP3' });
-                })
-                .pipe(res);
+            const audioResponse = await axios.get(musicUrl, {
+                responseType: 'stream',
+                headers
+            });
+
+            res.setHeader('Content-Type', 'audio/mpeg');
+            res.setHeader('Content-Disposition', 'attachment; filename="tiktok_audio.mp3"');
+            audioResponse.data.pipe(res);
         } else {
-            // Send video directly
+            // For video, use the play URL
+            const videoUrl = apiResponse.data.data.play;
+            if (!videoUrl) {
+                throw new Error('No video URL available');
+            }
+
+            const videoResponse = await axios.get(videoUrl, {
+                responseType: 'stream',
+                headers
+            });
+
             res.setHeader('Content-Type', 'video/mp4');
-            res.end(videoResponse.data);
+            res.setHeader('Content-Disposition', 'attachment; filename="tiktok_video.mp4"');
+            videoResponse.data.pipe(res);
         }
 
     } catch (error) {
