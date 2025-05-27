@@ -46,6 +46,52 @@ app.post('/api/video-info', async (req, res) => {
     }
 });
 
+// Download endpoint
+app.get('/api/download', async (req, res) => {
+    try {
+        const { url, format } = req.query;
+        if (!url) {
+            return res.status(400).json({ error: 'URL is required' });
+        }
+
+        const headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Referer': 'https://www.tiktok.com/'
+        };
+
+        // Get video info first
+        const apiResponse = await axios.get(`https://www.tikwm.com/api/?url=${url}`, { headers });
+        
+        if (apiResponse.data.code !== 0 || !apiResponse.data.data || !apiResponse.data.data.play) {
+            throw new Error('Failed to get video information');
+        }
+
+        const videoUrl = apiResponse.data.data.play;
+        const videoTitle = apiResponse.data.data.title || 'tiktok_video';
+        
+        // Stream the video
+        const videoResponse = await axios({
+            method: 'GET',
+            url: videoUrl,
+            responseType: 'stream',
+            headers
+        });
+
+        // Set headers for download
+        res.setHeader('Content-Type', 'video/mp4');
+        res.setHeader('Content-Disposition', `attachment; filename="${videoTitle}.mp4"`);
+        
+        // Pipe the video stream to response
+        videoResponse.data.pipe(res);
+    } catch (error) {
+        console.error('Download error:', error);
+        res.status(500).json({ 
+            error: 'Failed to download video',
+            details: error.message 
+        });
+    }
+});
+
 // Proxy endpoint for video streaming
 app.get('/proxy/video', async (req, res) => {
     try {
@@ -72,38 +118,6 @@ app.get('/proxy/video', async (req, res) => {
         console.error('Proxy error:', error);
         res.status(500).json({ 
             error: 'Failed to proxy video',
-            details: error.message 
-        });
-    }
-});
-
-// Download endpoint
-app.post('/api/download', async (req, res) => {
-    try {
-        const { url } = req.body;
-        if (!url) {
-            return res.status(400).json({ error: 'URL is required' });
-        }
-
-        const headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Referer': 'https://www.tiktok.com/'
-        };
-
-        const response = await axios.get(`https://www.tikwm.com/api/?url=${url}`, { headers });
-        
-        if (response.data.data && response.data.data.play) {
-            res.json({
-                success: true,
-                url: response.data.data.play
-            });
-        } else {
-            throw new Error('Invalid response from TikTok API');
-        }
-    } catch (error) {
-        console.error('Download error:', error);
-        res.status(500).json({ 
-            error: 'Failed to process download',
             details: error.message 
         });
     }
