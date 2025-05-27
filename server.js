@@ -25,7 +25,7 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // Serve static files
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Video info endpoint
 app.post('/api/video-info', async (req, res) => {
@@ -70,15 +70,15 @@ app.post('/api/download', async (req, res) => {
             'Referer': 'https://www.tiktok.com/'
         };
 
-        const apiResponse = await axios.get(`https://www.tikwm.com/api/?url=${url}`, { headers });
-        
-        if (apiResponse.data.code !== 0 || !apiResponse.data.data) {
-            throw new Error('Failed to get video information');
-        }
-
-        // For MP3, use the music URL if available
+        // For MP3, use a different API endpoint
         if (format === 'mp3') {
-            const musicUrl = apiResponse.data.data.music;
+            const apiResponse = await axios.get(`https://www.tikwm.com/api/?url=${url}&hd=1&music=1`, { headers });
+            
+            if (apiResponse.data.code !== 0 || !apiResponse.data.data) {
+                throw new Error('Failed to get audio information');
+            }
+
+            const musicUrl = apiResponse.data.data.music_info.play;
             if (!musicUrl) {
                 throw new Error('No audio available for this video');
             }
@@ -92,12 +92,14 @@ app.post('/api/download', async (req, res) => {
             res.setHeader('Content-Disposition', 'attachment; filename="tiktok_audio.mp3"');
             audioResponse.data.pipe(res);
         } else {
-            // For video, use the play URL
-            const videoUrl = apiResponse.data.data.play;
-            if (!videoUrl) {
-                throw new Error('No video URL available');
+            // For video, use the normal endpoint
+            const apiResponse = await axios.get(`https://www.tikwm.com/api/?url=${url}&hd=1`, { headers });
+            
+            if (apiResponse.data.code !== 0 || !apiResponse.data.data || !apiResponse.data.data.play) {
+                throw new Error('Failed to get video information');
             }
 
+            const videoUrl = apiResponse.data.data.play;
             const videoResponse = await axios.get(videoUrl, {
                 responseType: 'stream',
                 headers
