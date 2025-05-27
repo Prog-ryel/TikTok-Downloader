@@ -19,6 +19,12 @@ if (!fs.existsSync(downloadsDir)) {
     fs.mkdirSync(downloadsDir, { recursive: true });
 }
 
+// Basic error handling
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ error: 'Something went wrong!' });
+});
+
 // Routes
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -27,6 +33,26 @@ app.get('/', (req, res) => {
 // Serve any static file from public directory
 app.get('*.*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', req.path));
+});
+
+// Video info endpoint
+app.post('/api/video-info', async (req, res) => {
+    try {
+        const { url } = req.body;
+        if (!url) {
+            return res.status(400).json({ error: 'URL is required' });
+        }
+
+        const headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        };
+
+        const response = await axios.get(`https://www.tikwm.com/api/?url=${url}`, { headers });
+        res.json(response.data);
+    } catch (error) {
+        console.error('Video info error:', error);
+        res.status(500).json({ error: 'Failed to fetch video information' });
+    }
 });
 
 // Proxy endpoint for video streaming
@@ -49,96 +75,45 @@ app.get('/proxy/video', async (req, res) => {
             headers
         });
 
-        // Forward the content type
         res.setHeader('Content-Type', response.headers['content-type']);
-        
-        // Pipe the video stream
         response.data.pipe(res);
     } catch (error) {
-        console.error('Proxy error:', error.message);
+        console.error('Proxy error:', error);
         res.status(500).json({ error: 'Failed to proxy video' });
     }
 });
 
-app.post('/api/video-info', async (req, res) => {
+// Download endpoint
+app.post('/api/download', async (req, res) => {
     try {
         const { url } = req.body;
+        if (!url) {
+            return res.status(400).json({ error: 'URL is required' });
+        }
+
         const headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Referer': 'https://www.tiktok.com/'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         };
 
         const response = await axios.get(`https://www.tikwm.com/api/?url=${url}`, { headers });
         
-        // Modify the response to use our proxy for video playback
         if (response.data.data && response.data.data.play) {
-            const originalUrl = response.data.data.play;
-            response.data.data.play = `/proxy/video?url=${encodeURIComponent(originalUrl)}`;
+            res.json({
+                success: true,
+                url: response.data.data.play
+            });
+        } else {
+            throw new Error('Invalid response from TikTok API');
         }
-        
-        res.json(response.data);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        console.error('Download error:', error);
+        res.status(500).json({ error: 'Failed to process download' });
     }
 });
 
-app.post('/api/download', async (req, res) => {
-    try {
-        const { url, format } = req.body;
-        const timestamp = Date.now();
-        const videoPath = path.join(downloadsDir, `tiktok_${timestamp}.mp4`);
-        const audioPath = path.join(downloadsDir, `tiktok_${timestamp}.mp3`);
-
-        // Get video info
-        const headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Referer': 'https://www.tiktok.com/'
-        };
-
-        const response = await axios.get(`https://www.tikwm.com/api/?url=${url}`, { headers });
-        const videoUrl = response.data.data.play;
-
-        // Download video
-        const videoResponse = await axios({
-            method: 'GET',
-            url: videoUrl,
-            responseType: 'stream',
-            headers
-        });
-
-        await new Promise((resolve, reject) => {
-            const writer = fs.createWriteStream(videoPath);
-            videoResponse.data.pipe(writer);
-            writer.on('finish', resolve);
-            writer.on('error', reject);
-        });
-
-        if (format === 'mp3') {
-            // Convert to MP3
-            await new Promise((resolve, reject) => {
-                ffmpeg(videoPath)
-                    .toFormat('mp3')
-                    .on('end', () => {
-                        fs.unlinkSync(videoPath); // Delete the video file
-                        resolve();
-                    })
-                    .on('error', reject)
-                    .save(audioPath);
-            });
-
-            res.json({
-                success: true,
-                file: `/downloads/tiktok_${timestamp}.mp3`
-            });
-        } else {
-            res.json({
-                success: true,
-                file: `/downloads/tiktok_${timestamp}.mp4`
-            });
-        }
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
+// Handle 404
+app.use((req, res) => {
+    res.status(404).json({ error: 'Not found' });
 });
 
 // Cleanup old files every hour
@@ -158,6 +133,7 @@ setInterval(() => {
     }
 }, 3600000);
 
+// Start server
 app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+    console.log(`Server running on port ${port}`);
 }); 
