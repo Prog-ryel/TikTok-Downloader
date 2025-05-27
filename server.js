@@ -23,15 +23,20 @@ app.post('/api/video-info', async (req, res) => {
             'Referer': 'https://www.tiktok.com/'
         };
 
-        const response = await axios.get(`https://www.tikwm.com/api/?url=${url}`, { headers });
+        const apiResponse = await axios.get(`https://www.tikwm.com/api/?url=${url}`, { headers });
         
+        // Check if the API response is valid
+        if (apiResponse.data.code !== 0) {
+            throw new Error(apiResponse.data.msg || 'Failed to fetch video');
+        }
+
         // Modify the response to use our proxy for video playback
-        if (response.data.data && response.data.data.play) {
-            const originalUrl = response.data.data.play;
-            response.data.data.play = `/proxy/video?url=${encodeURIComponent(originalUrl)}`;
+        if (apiResponse.data.data && apiResponse.data.data.play) {
+            const originalUrl = apiResponse.data.data.play;
+            apiResponse.data.data.play = `/proxy/video?url=${encodeURIComponent(originalUrl)}`;
         }
         
-        res.json(response.data);
+        res.json(apiResponse.data);
     } catch (error) {
         console.error('Video info error:', error);
         res.status(500).json({ 
