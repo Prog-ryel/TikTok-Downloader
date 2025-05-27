@@ -5,6 +5,8 @@ const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const compression = require('compression');
+const ffmpeg = require('fluent-ffmpeg');
+const { Readable } = require('stream');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -25,7 +27,7 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static('public'));
 
 // Video info endpoint
 app.post('/api/video-info', async (req, res) => {
@@ -78,17 +80,35 @@ app.post('/api/download', async (req, res) => {
 
         const videoUrl = apiResponse.data.data.play;
         const videoResponse = await axios.get(videoUrl, {
-            responseType: 'stream',
+            responseType: 'arraybuffer',
             headers
         });
 
-        // Set appropriate headers for direct download
+        // Set filename and content type
         const filename = format === 'mp3' ? 'tiktok_audio.mp3' : 'tiktok_video.mp4';
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        res.setHeader('Content-Type', format === 'mp3' ? 'audio/mpeg' : 'video/mp4');
 
-        // Pipe the video stream directly to response
-        videoResponse.data.pipe(res);
+        if (format === 'mp3') {
+            // Convert to MP3 using ffmpeg
+            res.setHeader('Content-Type', 'audio/mpeg');
+            
+            const inputStream = new Readable();
+            inputStream.push(videoResponse.data);
+            inputStream.push(null);
+
+            ffmpeg(inputStream)
+                .toFormat('mp3')
+                .audioBitrate('192k')
+                .on('error', (err) => {
+                    console.error('FFmpeg error:', err);
+                    res.status(500).json({ error: 'Failed to convert to MP3' });
+                })
+                .pipe(res);
+        } else {
+            // Send video directly
+            res.setHeader('Content-Type', 'video/mp4');
+            res.end(videoResponse.data);
+        }
 
     } catch (error) {
         console.error('Download error:', error);
