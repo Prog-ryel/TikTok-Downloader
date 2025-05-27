@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok Downloader</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <!-- Meta tags for security -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://cdnjs.cloudflare.com https://www.tikwm.com; img-src 'self' data: https:; media-src 'self' blob: https:; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com;">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta name="referrer" content="no-referrer">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fab fa-tiktok"></i> TikTok Downloader</h1>
+            <p>Download TikTok videos without watermark</p>
+        </header>
+
+        <main>
+            <div class="input-section">
+                <div class="url-input">
+                    <input type="text" id="videoUrl" placeholder="Paste TikTok video URL here...">
+                    <button id="pasteBtn" title="Paste from clipboard">
+                        <i class="fas fa-paste"></i>
+                    </button>
+                    <button id="clearBtn" title="Clear input">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <button id="previewBtn" class="primary-btn">
+                    <i class="fas fa-eye"></i> Preview
+                </button>
+            </div>
+
+            <div class="preview-section" style="display: none;">
+                <div class="video-info">
+                    <div class="thumbnail">
+                        <img id="videoThumbnail" src="" alt="Video thumbnail">
+                    </div>
+                    <div class="info-text">
+                        <h3 id="videoTitle">Title</h3>
+                        <p id="videoAuthor">Author</p>
+                        <p id="videoDuration">Duration: <span></span></p>
+                    </div>
+                </div>
+
+                <div class="download-options">
+                    <div class="format-selection">
+                        <label>
+                            <input type="radio" name="format" value="mp4" checked>
+                            <span><i class="fas fa-video"></i> Video (MP4)</span>
+                        </label>
+                        <label>
+                            <input type="radio" name="format" value="mp3">
+                            <span><i class="fas fa-music"></i> Audio (MP3)</span>
+                        </label>
+                    </div>
+
+                    <a id="downloadBtn" class="primary-btn" download>
+                        <i class="fas fa-download"></i> Download
+                    </a>
+
+                    <button id="viewVideoBtn" class="secondary-btn view-video-btn">
+                        <i class="fas fa-play-circle"></i> View Video
+                    </button>
+                </div>
+            </div>
+
+            <div class="video-player-section" style="display: none;">
+                <div class="video-container">
+                    <video id="videoPlayer" controls playsinline>
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+            </div>
+
+            <div class="progress-section" style="display: none;">
+                <div class="progress-bar">
+                    <div class="progress"></div>
+                </div>
+                <p id="statusText"></p>
+            </div>
+        </main>
+
+        <footer>
+            <button id="openDownloadsBtn" class="secondary-btn">
+                <i class="fas fa-folder-open"></i> Open Downloads Folder
+            </button>
+            <p style="margin-top: 20px; text-align: center; color: #666;">Maintained by BSIT IA</p>
+        </footer>
+    </div>
+
+    <!-- Use minified and obfuscated JavaScript -->
+    <script src="/js/app.min.js"></script>
+</body>
+</html> 
