@@ -2,12 +2,29 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const path = require('path');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const compression = require('compression');
 
 const app = express();
+const port = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
 app.use(express.json());
+app.use(cors());
+app.use(helmet({
+    contentSecurityPolicy: false,
+}));
+app.use(compression());
+
+// Rate limiting
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100 // limit each IP to 100 requests per windowMs
+});
+app.use(limiter);
+
+// Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Video info endpoint
@@ -43,7 +60,7 @@ app.post('/api/video-info', async (req, res) => {
 // Download endpoint
 app.post('/api/download', async (req, res) => {
     try {
-        const { url } = req.body;
+        const { url, format } = req.body;
         if (!url) {
             return res.status(400).json({ error: 'URL is required' });
         }
@@ -59,11 +76,20 @@ app.post('/api/download', async (req, res) => {
             throw new Error('Failed to get video information');
         }
 
-        res.json({
-            success: true,
-            url: apiResponse.data.data.play,
-            title: apiResponse.data.data.title || 'tiktok_video'
+        const videoUrl = apiResponse.data.data.play;
+        const videoResponse = await axios.get(videoUrl, {
+            responseType: 'stream',
+            headers
         });
+
+        // Set appropriate headers for direct download
+        const filename = format === 'mp3' ? 'tiktok_audio.mp3' : 'tiktok_video.mp4';
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Type', format === 'mp3' ? 'audio/mpeg' : 'video/mp4');
+
+        // Pipe the video stream directly to response
+        videoResponse.data.pipe(res);
+
     } catch (error) {
         console.error('Download error:', error);
         res.status(500).json({ 
@@ -118,13 +144,9 @@ app.use((err, req, res, next) => {
     });
 });
 
-// For local development
-if (process.env.NODE_ENV !== 'production') {
-    const port = process.env.PORT || 3000;
-    app.listen(port, () => {
-        console.log(`Server running on port ${port}`);
-    });
-}
+app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+});
 
 // Export the Express API for Vercel
 module.exports = app; 
