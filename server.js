@@ -11,7 +11,7 @@ const port = process.env.PORT || 3000;
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Create downloads directory if it doesn't exist
 const downloadsDir = path.join(__dirname, 'public', 'downloads');
@@ -21,8 +21,8 @@ if (!fs.existsSync(downloadsDir)) {
 
 // Basic error handling
 app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({ error: 'Something went wrong!' });
+    console.error('Error:', err);
+    res.status(500).json({ error: 'Server error', details: err.message });
 });
 
 // Routes
@@ -136,4 +136,7 @@ setInterval(() => {
 // Start server
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
-}); 
+});
+
+// Export the Express API
+module.exports = app; 
